@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Days, Utc};
 use clap::Parser;
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
@@ -16,8 +16,16 @@ async fn main() -> Result<()> {
     let session_id = permit_session(&client).await?;
 
     let output = match args.find_url(&client, &session_id).await {
-        Ok((url, expiration)) => UrlOutput::Success { url, expiration },
-        Err(e) => UrlOutput::Error(e.to_string()),
+        Ok((url, expiration)) => Output {
+            status: OutputStatus::Success { url },
+            expiration,
+        },
+        Err(e) => Output {
+            status: OutputStatus::Error {
+                error: e.to_string(),
+            },
+            expiration: Utc::now() + Days::new(1),
+        },
     };
     let output_serialized = serde_json::to_string(&output)?;
     println!("{output_serialized}");
@@ -26,12 +34,17 @@ async fn main() -> Result<()> {
 }
 
 #[derive(Serialize)]
-enum UrlOutput {
-    Success {
-        url: String,
-        expiration: DateTime<Utc>,
-    },
-    Error(String),
+struct Output {
+    #[serde(flatten)]
+    status: OutputStatus,
+    expiration: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "status")]
+enum OutputStatus {
+    Success { url: String },
+    Error { error: String },
 }
 
 #[derive(Parser)]
