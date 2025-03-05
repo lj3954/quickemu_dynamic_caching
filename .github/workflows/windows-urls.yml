@@ -1,0 +1,50 @@
+name: Gather Windows URLs
+
+on:
+  schedule:
+    - cron: "30 12 * * *"
+  workflow_dispatch:
+  repository_dispatch:
+    types: [windows_urls]
+
+jobs:
+  setup-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.setup-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore cache
+        uses: actions/cache/restore@v4
+        with:
+          path: target/release/create_windows_matrix
+          key: ${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+
+      - id: generate-matrix
+        run: |
+          matrix="$(./target/release/create_windows_matrix)"
+          echo "matrix=${matrix}" >> $GITHUB_OUTPUT
+
+  cache_windows_urls:
+    needs: setup-matrix
+    strategy:
+      matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore cache
+        uses: actions/cache/restore@v4
+        with:
+          path: target/release/get_windows_urls
+          key: ${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+
+      - id: get-url
+        run: |
+          data="$(./target/release/get_windows_urls \
+            --arch ${{ matrix.arch }} \
+            --referer ${{ matrix.referer }} \
+            --sku ${{ matrix.sku }} \
+            --product-edition-id ${{ matrix.product_edition_id }})"
+          echo "${data}"

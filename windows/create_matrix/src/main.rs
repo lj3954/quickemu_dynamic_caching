@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
         .flatten()
         .collect();
 
-    println!("{}", serde_json::to_string_pretty(&matrix).unwrap());
+    println!("{}", serde_json::to_string(&matrix).unwrap());
 
     Ok(())
 }

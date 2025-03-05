@@ -1,0 +1,31 @@
+name: Cache 
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  cache:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Build
+        run: cargo build --verbose -p get_windows_urls -p create_windows_matrix --release
+
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            target/release/get_windows_urls
+            target/release/create_windows_matrix
+          key: ${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Get Windows URLs
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: windows_urls
