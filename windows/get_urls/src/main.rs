@@ -17,11 +17,11 @@ async fn main() -> Result<()> {
 
     let output = match args.find_url(&client, &session_id).await {
         Ok((url, expiration)) => Output {
-            status: OutputStatus::Success { url },
+            result: OutputStatus::Success { url },
             expiration,
         },
         Err(e) => Output {
-            status: OutputStatus::Error {
+            result: OutputStatus::Error {
                 error: e.to_string(),
             },
             expiration: Utc::now() + Days::new(1),
@@ -35,8 +35,7 @@ async fn main() -> Result<()> {
 
 #[derive(Serialize)]
 struct Output {
-    #[serde(flatten)]
-    status: OutputStatus,
+    result: OutputStatus,
     expiration: DateTime<Utc>,
 }
 
