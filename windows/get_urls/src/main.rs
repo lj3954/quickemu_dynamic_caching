@@ -15,18 +15,32 @@ async fn main() -> Result<()> {
     let client = Client::new();
     let session_id = permit_session(&client).await?;
 
-    let output = match args.find_url(&client, &session_id).await {
-        Ok((url, expiration)) => Output {
-            result: OutputStatus::Success { url },
+    let (status, expiration) = match args.find_url(&client, &session_id).await {
+        Ok((url, expiration)) => (
+            OutputStatus::Success {
+                url,
+                checksum: args.checksum,
+            },
             expiration,
-        },
-        Err(e) => Output {
-            result: OutputStatus::Error {
+        ),
+        Err(e) => (
+            OutputStatus::Error {
                 error: e.to_string(),
             },
-            expiration: Utc::now() + Days::new(1),
-        },
+            Utc::now() + Days::new(1),
+        ),
     };
+
+    let output = Output {
+        result: OutputResult {
+            arch: args.arch,
+            release: args.release,
+            language: args.language,
+            status,
+        },
+        expiration: expiration.timestamp(),
+    };
+
     let output_serialized = serde_json::to_string(&output)?;
     println!("{output_serialized}");
 
@@ -35,27 +49,46 @@ async fn main() -> Result<()> {
 
 #[derive(Serialize)]
 struct Output {
-    result: OutputStatus,
-    expiration: DateTime<Utc>,
+    result: OutputResult,
+    expiration: i64,
+}
+
+#[derive(Serialize)]
+struct OutputResult {
+    release: String,
+    arch: String,
+    language: String,
+    status: OutputStatus,
 }
 
 #[derive(Serialize)]
 #[serde(tag = "status")]
 enum OutputStatus {
-    Success { url: String },
-    Error { error: String },
+    Success {
+        url: String,
+        checksum: Option<String>,
+    },
+    Error {
+        error: String,
+    },
 }
 
 #[derive(Parser)]
 struct Args {
     #[clap(long)]
+    release: String,
+    #[clap(long)]
     arch: String,
+    #[clap(long)]
+    language: String,
     #[clap(long)]
     referer: String,
     #[clap(long)]
     sku: String,
     #[clap(long)]
     product_edition_id: String,
+    #[clap(long)]
+    checksum: Option<String>,
 }
 
 #[derive(Deserialize)]

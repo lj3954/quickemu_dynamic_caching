@@ -26,15 +26,6 @@ jobs:
           matrix="$(./target/release/create_windows_matrix)"
           echo "matrix=${matrix}" >> $GITHUB_OUTPUT
 
-  display_matrix_json:
-    needs: setup-matrix
-
-    runs-on: ubuntu-latest
-    steps:
-      - name: Display
-        run: |
-          echo ${{ needs.setup-matrix.outputs.matrix }}
-
   cache_windows_urls:
     needs: setup-matrix
     strategy:
@@ -50,11 +41,35 @@ jobs:
           path: target/release/get_windows_urls
           key: ${{ runner.os }}-get_windows_urls-${{ hashFiles('Cargo.lock') }}
 
-      - id: get-url
+      - id: get-data
         run: |
-          data="$(./target/release/get_windows_urls \
-            --arch ${{ matrix.arch }} \
-            --referer ${{ matrix.referer }} \
-            --sku ${{ matrix.sku }} \
-            --product-edition-id ${{ matrix.product_edition_id }})"
-          echo "${data}"
+          ARGS=(
+            --release "${{ matrix.release }}" \
+            --arch "${{ matrix.arch }}" \
+            --language "${{ matrix.language }}" \
+            --referer "${{ matrix.referer }}" \
+            --sku "${{ matrix.sku }}" \
+            --product-edition-id "${{ matrix.product_edition_id }}"
+          )
+          if [ "${{ matrix.checksum }}" != "null" ]; then
+            ARGS+=(--checksum "${{ matrix.checksum }}")
+          fi
+
+          JSON_OUTPUT="$(./target/release/get_windows_urls "${ARGS[@]}")"
+
+          EXPIRATION="$(echo "${JSON_OUTPUT}" | jq -rc .expiration)"
+          DATA="$(echo "${JSON_OUTPUT}" | jq -rc .result)"
+          
+          echo "expiration=${EXPIRATION}" >> $GITHUB_OUTPUT
+          echo "data=${DATA}" >> $GITHUB_OUTPUT
+
+      - name: Populate KV
+        uses: zentered/cloudflare-kv-action@v1.0.1
+        env:
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }} 
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        with:
+          namespace_identifier: ${{ secrets.CLOUDFLARE_NAMESPACE_ID }}
+          key_name: windows-${{ matrix.sku }}
+          value: ${{ steps.get-data.outputs.data }}
+          expiration: ${{ steps.get-data.outputs.expiration }}
