@@ -67,7 +67,7 @@ async fn main() -> Result<()> {
         .into_iter()
         .inspect(|r| {
             if let Err(e) = r {
-                println!("Error: {e}")
+                eprintln!("Error: {e}")
             }
         })
         .flatten()
@@ -122,7 +122,9 @@ type SkuMatrix = Vec<SkuMatrixEntry>;
 struct SkuMatrixEntry {
     release: &'static str,
     arch: &'static str,
+    referer: &'static str,
     language: String,
+    product_edition_id: String,
     sku: String,
     checksum: Option<String>,
 }
@@ -132,18 +134,20 @@ impl DataSearch {
         &self,
         release: &'static str,
         arch: &'static str,
-    ) -> Result<impl IntoIterator<Item = SkuMatrixEntry>> {
-        let (skus, mut checksums) = self.find_skus_and_checksums().await?;
+    ) -> Result<impl IntoIterator<Item = SkuMatrixEntry> + use<'_>> {
+        let (skus, product_edition_id, mut checksums) = self.find_sku_data().await?;
         Ok(skus.into_iter().map(move |sku| SkuMatrixEntry {
             release,
             arch,
+            referer: self.url,
             checksum: checksums.remove(&sku.language),
             language: sku.language,
             sku: sku.id,
+            product_edition_id: product_edition_id.clone(),
         }))
     }
 
-    async fn find_skus_and_checksums(&self) -> Result<(Vec<Sku>, HashMap<String, String>)> {
+    async fn find_sku_data(&self) -> Result<(Vec<Sku>, String, HashMap<String, String>)> {
         let (product_edition_id, checksum_map) = self.find_product_data().await?;
 
         let url = format!("https://www.microsoft.com/software-download-connector/api/getskuinformationbyproductedition?profile={PROFILE}&ProductEditionId={product_edition_id}&SKU=undefined&friendlyFileName=undefined&Locale=en-US&sessionID={}", self.session_id);
@@ -160,7 +164,7 @@ impl DataSearch {
             .context("Failed to parse SKU JSON data")?
             .skus;
 
-        Ok((skus, checksum_map))
+        Ok((skus, product_edition_id, checksum_map))
     }
 
     async fn find_product_data(&self) -> Result<(String, HashMap<String, String>)> {
@@ -190,7 +194,7 @@ impl DataSearch {
             .map(|(_, [language, checksum])| (language.to_string(), checksum.to_string()))
             .collect();
 
-        println!("checksums: {:?}", checksum_map);
+        eprintln!("checksums: {:?}", checksum_map);
 
         Ok((product_edition_id, checksum_map))
     }

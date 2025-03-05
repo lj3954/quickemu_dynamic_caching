@@ -1,5 +1,3 @@
 [workspace]
-members = [
-    "create_windows_matrix",
-]
+members = ["windows/create_matrix", "windows/get_urls"]
 resolver = "2"
