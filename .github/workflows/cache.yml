@@ -17,13 +17,17 @@ jobs:
       - name: Build
         run: cargo build --verbose -p get_windows_urls -p create_windows_matrix --release
 
-      - name: Cache
+      - name: Cache get_windows_urls
         uses: actions/cache@v4
         with:
-          path: |
-            target/release/get_windows_urls
-            target/release/create_windows_matrix
-          key: ${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          path: target/release/get_windows_urls
+          key: ${{ runner.os }}-get_windows_urls-${{ hashFiles('Cargo.lock') }}
+
+      - name: Cache create_windows_matrix
+        uses: actions/cache@v4
+        with:
+          path: target/release/create_windows_matrix
+          key: ${{ runner.os }}-create_windows_matrix-${{ hashFiles('Cargo.lock') }}
 
       - name: Get Windows URLs
         uses: peter-evans/repository-dispatch@v3
