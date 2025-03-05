@@ -25,6 +25,7 @@ jobs:
         run: |
           matrix="$(./target/release/create_windows_matrix)"
           echo "matrix=${matrix}" >> $GITHUB_OUTPUT
+          echo "$GITHUB_OUTPUT"
 
   cache_windows_urls:
     needs: setup-matrix
