@@ -26,6 +26,14 @@ jobs:
           matrix="$(./target/release/create_windows_matrix)"
           echo "matrix=${matrix}" >> $GITHUB_OUTPUT
 
+  display_matrix_json:
+    needs: setup-matrix
+
+    steps:
+      - name: Display
+        run: |
+          echo ${{ needs.setup-matrix.outputs.matrix }}
+
   cache_windows_urls:
     needs: setup-matrix
     strategy:
