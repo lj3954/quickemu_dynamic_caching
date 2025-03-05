@@ -29,6 +29,7 @@ jobs:
   display_matrix_json:
     needs: setup-matrix
 
+    runs-on: ubuntu-latest
     steps:
       - name: Display
         run: |
