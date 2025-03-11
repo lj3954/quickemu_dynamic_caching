@@ -74,7 +74,7 @@ jobs:
             -X PUT \
             -H 'Content-Type: multipart/form-data' \
             -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_KEY }}" \
-            -d "${BODY}")"
+            --data-binary "${BODY}")"
 
           echo "${RESULT}"
           
