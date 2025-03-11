@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Days, Utc};
 use clap::Parser;
 use reqwest::{header, Client};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
 const PROFILE: &str = "606624d44113";
@@ -15,30 +15,42 @@ async fn main() -> Result<()> {
     let client = Client::new();
     let session_id = permit_session(&client).await?;
 
-    let (status, expiration) = match args.find_url(&client, &session_id).await {
-        Ok((url, expiration)) => (
-            OutputStatus::Success {
-                url,
+    let (value, metadata, expiration) = match args.find_url(&client, &session_id).await {
+        Ok((url, filename, expiration)) => {
+            let metadata = OutputMetadata {
+                release: args.release,
+                arch: args.arch,
+                edition: args.language,
+                filename: Some(filename),
                 checksum: args.checksum,
-            },
-            expiration,
-        ),
-        Err(e) => (
-            OutputStatus::Error {
-                error: e.to_string(),
-            },
-            Utc::now() + Days::new(1),
-        ),
+                error: None,
+            };
+            (OutputValue::Success { url }, metadata, expiration)
+        }
+        Err(e) => {
+            let metadata = OutputMetadata {
+                release: args.release,
+                arch: args.arch,
+                edition: args.language,
+                filename: None,
+                checksum: None,
+                error: Some(e.to_string()),
+            };
+            (
+                OutputValue::Failure {
+                    error: e.to_string(),
+                },
+                metadata,
+                Utc::now() + Days::new(1),
+            )
+        }
     };
 
     let output = Output {
-        result: OutputResult {
-            arch: args.arch,
-            release: args.release,
-            language: args.language,
-            status,
-        },
+        key: format!("windows-{}", args.sku),
+        value: Stringified(value),
         expiration: expiration.timestamp(),
+        metadata: Stringified(metadata),
     };
 
     let output_serialized = serde_json::to_string(&output)?;
@@ -49,28 +61,42 @@ async fn main() -> Result<()> {
 
 #[derive(Serialize)]
 struct Output {
-    result: OutputResult,
+    key: String,
+    value: Stringified<OutputValue>,
+    metadata: Stringified<OutputMetadata>,
     expiration: i64,
 }
 
 #[derive(Serialize)]
-struct OutputResult {
-    release: String,
-    arch: String,
-    language: String,
-    status: OutputStatus,
+#[serde(tag = "status")]
+enum OutputValue {
+    Success { url: String },
+    Failure { error: String },
 }
 
 #[derive(Serialize)]
-#[serde(tag = "status")]
-enum OutputStatus {
-    Success {
-        url: String,
-        checksum: Option<String>,
-    },
-    Error {
-        error: String,
-    },
+struct OutputMetadata {
+    release: String,
+    arch: String,
+    edition: String,
+    filename: Option<String>,
+    checksum: Option<String>,
+    error: Option<String>,
+}
+
+struct Stringified<T: Serialize>(T);
+
+impl<T: Serialize> Serialize for Stringified<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // First serialize to a JSON string
+        let json = serde_json::to_string(&self.0).map_err(serde::ser::Error::custom)?;
+
+        // Then serialize that string
+        serializer.serialize_str(&json)
+    }
 }
 
 #[derive(Parser)]
@@ -117,7 +143,11 @@ struct DownloadOption {
 }
 
 impl Args {
-    async fn find_url(&self, client: &Client, session_id: &str) -> Result<(String, DateTime<Utc>)> {
+    async fn find_url(
+        &self,
+        client: &Client,
+        session_id: &str,
+    ) -> Result<(String, String, DateTime<Utc>)> {
         let url = format!("https://www.microsoft.com/software-download-connector/api/getskuinformationbyproductedition?profile={PROFILE}&ProductEditionId={}&SKU=undefined&friendlyFileName=undefined&Locale=en-US&sessionID={session_id}", self.product_edition_id);
         client
             .get(&url)
@@ -159,7 +189,19 @@ impl Args {
             .map(|dl| dl.uri)
             .context("Could not find any valid download option")?;
 
-        Ok((url, options.download_expiration_datetime))
+        let dl_request = client
+            .get(&url)
+            .send()
+            .await
+            .context("Could not send request to found URL")?;
+        let filename = dl_request
+            .url()
+            .path_segments()
+            .and_then(|path| path.last())
+            .context("Final URL somehow has no path")?
+            .to_string();
+
+        Ok((url, filename, options.download_expiration_datetime))
     }
 }
 

@@ -57,19 +57,17 @@ jobs:
 
           JSON_OUTPUT="$(./target/release/get_windows_urls "${ARGS[@]}")"
 
+          KEY="$(echo "${JSON_OUTPUT}" | jq -rc .key)"
           EXPIRATION="$(echo "${JSON_OUTPUT}" | jq -rc .expiration)"
-          DATA="$(echo "${JSON_OUTPUT}" | jq -rc .result)"
+          DATA="$(echo "${JSON_OUTPUT}" | jq -c '{metadata, value}')"
           
+          echo "key=${KEY}" >> $GITHUB_OUTPUT
           echo "expiration=${EXPIRATION}" >> $GITHUB_OUTPUT
           echo "data=${DATA}" >> $GITHUB_OUTPUT
 
       - name: Populate KV
-        uses: zentered/cloudflare-kv-action@v1.0.1
-        env:
-          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }} 
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        with:
-          namespace_identifier: ${{ secrets.CLOUDFLARE_NAMESPACE_ID }}
-          key_name: windows-${{ matrix.sku }}
-          value: ${{ steps.get-data.outputs.data }}
-          expiration: ${{ steps.get-data.outputs.expiration }}
+        run: |
+          curl "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/storage/kv/namespaces/${{ secrets.CLOUDFLARE_NAMESPACE_ID }}/values/${{ steps.get-data.outputs.key }}?expiration=${{ steps.get-data.outputs.expiration }}" \
+            -H 'Content-Type: multipart/form-data' \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_KEY }}" \
+            -d "${{ steps.get-data.outputs.data }}"
