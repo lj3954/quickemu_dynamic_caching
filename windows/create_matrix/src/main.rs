@@ -28,10 +28,7 @@ const RELEASE_MATRIX: [(&str, &str, &str); 3] = [
 
 const PROFILE: &str = "606624d44113";
 
-const HASH_REGEX: &str = r#"
-</tr><tr><td>([\w\s()]+) 64-bit</td>
-<td>([A-F0-9]{64})</td>
-"#;
+const HASH_REGEX: &str = r#"</tr><tr><td>([\w\s()]+) 64-bit</td>\s*<td>([A-F0-9]{64})</td>"#;
 const PRODUCT_EDITION_REGEX: &str = r#"option value="(\d+)"#;
 
 #[tokio::main]
