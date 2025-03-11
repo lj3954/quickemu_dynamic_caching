@@ -66,10 +66,11 @@ jobs:
           echo "data=${DATA}" >> $GITHUB_OUTPUT
 
       - name: Populate KV
+        env:
+          BODY: ${{ steps.get-data.outputs.data }}
         run: |
-          echo "${{ steps.get-data.outputs.data }}" > data.json
           curl "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/storage/kv/namespaces/${{ secrets.CLOUDFLARE_NAMESPACE_ID }}/values/${{ steps.get-data.outputs.key }}?expiration=${{ steps.get-data.outputs.expiration }}" \
             -X PUT \
             -H 'Content-Type: multipart/form-data' \
             -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_KEY }}" \
-            -d @data.json
+            -d "${BODY}"
