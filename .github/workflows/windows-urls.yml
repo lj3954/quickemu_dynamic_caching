@@ -59,7 +59,7 @@ jobs:
 
           KEY="$(echo "${JSON_OUTPUT}" | jq -rc .key)"
           EXPIRATION="$(echo "${JSON_OUTPUT}" | jq -rc .expiration)"
-          DATA="$(echo "${JSON_OUTPUT}" | jq -c '{metadata, value}')"
+          DATA="$(echo "${JSON_OUTPUT}" | jq -c '{metadata, value}' | sed 's/\\/\\\\/g')"
           
           echo "key=${KEY}" >> $GITHUB_OUTPUT
           echo "expiration=${EXPIRATION}" >> $GITHUB_OUTPUT
@@ -67,13 +67,11 @@ jobs:
 
       - name: Populate KV
         run: |
-          echo "${{ steps.get-data.outputs.data }}" > data.json
-          cat data.json
           RESULT="$(curl "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/storage/kv/namespaces/${{ secrets.CLOUDFLARE_NAMESPACE_ID }}/values/${{ steps.get-data.outputs.key }}?expiration=${{ steps.get-data.outputs.expiration }}" \
             -X PUT \
             -H 'Content-Type: multipart/form-data' \
             -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_KEY }}" \
-            --data-binary @data.json)"
+            -d '${{ steps.get-data.outputs.data }}')"
 
           echo "${RESULT}"
           
