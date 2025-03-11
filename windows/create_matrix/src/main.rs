@@ -28,7 +28,7 @@ const RELEASE_MATRIX: [(&str, &str, &str); 3] = [
 
 const PROFILE: &str = "606624d44113";
 
-const HASH_REGEX: &str = r#"</tr><tr><td>([\w\s()]+) 64-bit</td>\s*<td>([A-F0-9]{64})</td>"#;
+const HASH_REGEX: &str = r#"<tr><td>([\w\s()]+) 64-bit</td>\s*<td>([A-F0-9]{64})</td>"#;
 const PRODUCT_EDITION_REGEX: &str = r#"option value="(\d+)"#;
 
 #[tokio::main]
@@ -103,6 +103,7 @@ struct Skus {
 struct Sku {
     id: String,
     language: String,
+    localized_language: String,
 }
 
 struct DataSearch {
@@ -137,7 +138,7 @@ impl DataSearch {
             release,
             arch,
             referer: self.url,
-            checksum: checksums.remove(&sku.language),
+            checksum: checksums.remove(&sku.localized_language),
             language: sku.language,
             sku: sku.id,
             product_edition_id: product_edition_id.clone(),
