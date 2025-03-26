@@ -1,7 +1,9 @@
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Days, Utc};
 use clap::Parser;
-use reqwest::{header, Client};
+use reqwest::header;
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware as Client};
+use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
@@ -11,8 +13,15 @@ const ARCH_DL_TYPES: [&str; 3] = ["i686-UNUSED", "x86_64", "aarch64"];
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
+    let client = {
+        let retry_middleware = RetryTransientMiddleware::new_with_policy(
+            ExponentialBackoff::builder().build_with_max_retries(5),
+        );
+        ClientBuilder::new(reqwest::Client::new())
+            .with(retry_middleware)
+            .build()
+    };
 
-    let client = Client::new();
     let session_id = permit_session(&client).await?;
 
     let (value, metadata, expiration) = match args.find_url(&client, &session_id).await {
