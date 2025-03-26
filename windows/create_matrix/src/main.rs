@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use anyhow::{Context, Result};
 use regex::Regex;
-use reqwest::{header, Client};
+use reqwest::header;
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware as Client};
+use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -33,7 +35,15 @@ const PRODUCT_EDITION_REGEX: &str = r#"option value="(\d+)"#;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let client = Client::new();
+    let client = {
+        let retry_middleware = RetryTransientMiddleware::new_with_policy(
+            ExponentialBackoff::builder().build_with_max_retries(5),
+        );
+        ClientBuilder::new(reqwest::Client::new())
+            .with(retry_middleware)
+            .build()
+    };
+
     let hash_regex = Regex::new(HASH_REGEX).unwrap();
     let product_edition_regex = Regex::new(PRODUCT_EDITION_REGEX).unwrap();
     let session_id = permit_session(&client).await?;
