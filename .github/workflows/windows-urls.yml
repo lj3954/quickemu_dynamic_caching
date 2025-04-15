@@ -81,7 +81,7 @@ jobs:
             
             if [ "$(echo "${RESULT}" | jq -rc .success)" == 'true' ]; then
               break
-            else if [[ $((++attempts)) -ge 5 ]]; then
+            elif [[ $((++attempts)) -ge 5 ]]; then
               exit 1
             fi
           done
