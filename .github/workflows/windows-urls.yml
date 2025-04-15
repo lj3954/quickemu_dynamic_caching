@@ -69,15 +69,19 @@ jobs:
 
       - name: Populate KV
         run: |
-          RESULT="$(curl "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/storage/kv/namespaces/${{ secrets.CLOUDFLARE_NAMESPACE_ID }}/values/${{ steps.get-data.outputs.key }}?expiration=${{ steps.get-data.outputs.expiration }}" \
-            -X PUT \
-            -H 'Content-Type: multipart/form-data' \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_KEY }}" \
-            -F 'metadata=${{ steps.get-data.outputs.metadata }}' \
-            -F 'value=${{ steps.get-data.outputs.value }}')"
+          while true; do
+            RESULT="$(curl "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/storage/kv/namespaces/${{ secrets.CLOUDFLARE_NAMESPACE_ID }}/values/${{ steps.get-data.outputs.key }}?expiration=${{ steps.get-data.outputs.expiration }}" \
+              -X PUT \
+              -H 'Content-Type: multipart/form-data' \
+              -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_KEY }}" \
+              -F 'metadata=${{ steps.get-data.outputs.metadata }}' \
+              -F 'value=${{ steps.get-data.outputs.value }}')"
 
-          echo "${RESULT}"
-          
-          if [ ! "$(echo "${RESULT}" | jq -rc .success)" == 'true' ]; then
-            exit 1
-          fi
+            echo "${RESULT}"
+            
+            if [ "$(echo "${RESULT}" | jq -rc .success)" == 'true' ]; then
+              break
+            else if [[ $((++attempts)) -ge 5 ]]; then
+              exit 1
+            fi
+          done
