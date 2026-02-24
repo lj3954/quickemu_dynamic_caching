@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Days, Utc};
 use clap::Parser;
+use regex::Regex;
 use reqwest::header;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware as Client};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
@@ -8,6 +9,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
 const PROFILE: &str = "606624d44113";
+const INSTANCE_ID: &str = "560dc9f3-1aa5-4a2f-b63c-9e18f8d0e175";
 const ARCH_DL_TYPES: [&str; 3] = ["i686-UNUSED", "x86_64", "aarch64"];
 
 #[tokio::main]
@@ -225,6 +227,42 @@ async fn permit_session(client: &Client) -> Result<String> {
         .send()
         .await
         .context("Failed to permit session")?;
+
+    let url = format!("https://ov-df.microsoft.com/mdt.js?instanceId={INSTANCE_ID}&PageId=si&session_id={session_id}");
+
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .context("Failed to retrieve ov-df data")?;
+    let text = response
+        .text()
+        .await
+        .context("Failed to retrieve ov-df data")?;
+
+    let w_regex = Regex::new(r#"[?&]w=([A-F0-9]+)"#).unwrap();
+    let rticks_regex = Regex::new(r#"rticks\=\"\+?(\d+)"#).unwrap();
+
+    let rticks = rticks_regex
+        .captures(&text)
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str())
+        .context("Could not find rticks from ov-df")?;
+
+    let w = w_regex
+        .captures(&text)
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str())
+        .context("Could not find w from ov-df")?;
+
+    let epoch = Utc::now().timestamp();
+
+    let url = format!("https://ov-df.microsoft.com/?session_id={session_id}&CustomerId={INSTANCE_ID}&PageId=si&w={w}&mdt={epoch}&rticks={rticks}");
+    client
+        .get(&url)
+        .send()
+        .await
+        .context("Failed to permit session with ov-df")?;
 
     Ok(session_id)
 }

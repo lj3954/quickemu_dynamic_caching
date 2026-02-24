@@ -5,8 +5,9 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.97"
-chrono = { version = "0.4.40", features = ["serde"] }
+chrono = { version = "0.4.40", features = ["serde", "now"] }
 clap = { version = "4.5.31", features = ["derive"] }
+regex = "1.12.3"
 reqwest = { version = "0.12.12", features = ["json"] }
 reqwest-middleware = "0.4.1"
 reqwest-retry = "0.7.0"
